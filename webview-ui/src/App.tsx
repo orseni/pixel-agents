@@ -14,7 +14,7 @@ import { EditorToolbar } from './office/editor/EditorToolbar.js';
 import { OfficeState } from './office/engine/officeState.js';
 import { isRotatable } from './office/layout/furnitureCatalog.js';
 import { EditTool } from './office/types.js';
-import { isBrowserRuntime } from './runtime.js';
+import { isBrowserRuntime, isTauriRuntime } from './runtime.js';
 import { vscode } from './vscodeApi.js';
 
 // Game state lives outside React — updated imperatively by message handlers
@@ -121,10 +121,12 @@ function EditActionBar({
 }
 
 function App() {
-  // Browser runtime (dev or static dist): dispatch mock messages after the
+  // Browser/Tauri runtime: dispatch mock asset messages after the
   // useExtensionMessages listener has been registered.
+  // In Tauri, assets are loaded the same way as browser (static files),
+  // but agent events come from the Rust backend via tauriAdapter.
   useEffect(() => {
-    if (isBrowserRuntime) {
+    if (isBrowserRuntime || isTauriRuntime) {
       void import('./browserMock.js').then(({ dispatchMockMessages }) => dispatchMockMessages());
     }
   }, []);
@@ -226,7 +228,7 @@ function App() {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          color: 'var(--vscode-foreground)',
+          color: 'var(--pixel-text)',
         }}
       >
         Loading...

@@ -1,34 +1,45 @@
 # Pixel Agents — Compressed Reference
 
-VS Code extension with embedded React webview: pixel art office where AI agents (Claude Code terminals) are animated characters.
+Standalone Tauri desktop app: pixel art office where Claude Code sessions are passively monitored and shown as animated characters.
 
 ## Architecture
 
 ```
-src/                          — Extension backend (Node.js, VS Code API)
-  constants.ts                — All backend magic numbers/strings (timing, truncation, asset parsing, VS Code IDs)
-  extension.ts                — Entry: activate(), deactivate()
-  PixelAgentsViewProvider.ts   — WebviewViewProvider, message dispatch, asset loading
-  assetLoader.ts              — PNG parsing, sprite conversion, catalog building, default layout loading
-  agentManager.ts             — Terminal lifecycle: launch, remove, restore, persist
-  layoutPersistence.ts        — User-level layout file I/O (~/.pixel-agents/layout.json), migration, cross-window watching
-  fileWatcher.ts              — fs.watch + polling, readNewLines, /clear detection, terminal adoption
-  transcriptParser.ts         — JSONL parsing: tool_use/tool_result → webview messages
-  timerManager.ts             — Waiting/permission timer logic
-  types.ts                    — Shared interfaces (AgentState, PersistedAgent)
+src-tauri/                     — Backend Rust (Tauri v2)
+  src/
+    main.rs                    — Bootstrap, windows subsystem
+    lib.rs                     — Module declarations, Tauri builder setup
+    constants.rs               — All backend magic numbers (timing, truncation, paths)
+    state.rs                   — AppState: shared RwLock-guarded state
+    models.rs                  — AgentState, ProjectInfo, AppSettings
+    discovery.rs               — Async loop scanning ~/.claude/projects/*/*.jsonl
+    project_name.rs            — Greedy path reconstruction from directory hash
+    file_watcher.rs            — Polling-based JSONL file watcher (1s interval)
+    line_reader.rs             — Incremental JSONL reading with partial line buffering
+    transcript_parser.rs       — JSONL record processing: tool_use/result/system/progress
+    timer_manager.rs           — Tokio timers: waiting (5s text-idle), permission (7s)
+    persistence.rs             — Layout (~/.pixel-agents/layout.json) + settings (settings.json)
+    commands.rs                — #[tauri::command] handlers (frontend → backend)
+    events.rs                  — Tauri event payloads (backend → frontend)
+  Cargo.toml                   — Rust dependencies
+  tauri.conf.json              — Tauri config (window, CSP, plugins, build commands)
 
 webview-ui/src/               — React + TypeScript (Vite)
+  runtime.ts                  — Runtime detection: 'vscode' | 'browser' | 'tauri'
+  vscodeApi.ts                — Conditional routing: Tauri invoke / VS Code postMessage / browser mock
+  tauriAdapter.ts             — Bridge: Tauri events → synthetic MessageEvents + tauriSend()
+  browserMock.ts              — Asset loading for browser/Tauri runtimes (PNG decode, mock dispatch)
   constants.ts                — All webview magic numbers/strings (grid, animation, rendering, camera, zoom, editor, game logic, notification sound)
   notificationSound.ts        — Web Audio API chime on agent turn completion, with enable/disable
   App.tsx                     — Composition root, hooks + components + EditActionBar
   hooks/
-    useExtensionMessages.ts   — Message handler + agent/tool state
+    useExtensionMessages.ts   — Message handler + agent/tool state (unchanged — receives MessageEvents)
     useEditorActions.ts       — Editor state + callbacks
     useEditorKeyboard.ts      — Keyboard shortcut effect
   components/
-    BottomToolbar.tsx          — + Agent, Layout toggle, Settings button
+    BottomToolbar.tsx          — Layout toggle, Settings button (+ Agent hidden in Tauri)
     ZoomControls.tsx           — +/- zoom (top-right)
-    SettingsModal.tsx          — Centered modal: settings, export/import layout, sound toggle, debug toggle
+    SettingsModal.tsx          — Settings modal (Tauri: uses @tauri-apps/plugin-dialog for export/import)
     DebugView.tsx              — Debug overlay
   office/
     types.ts                  — Interfaces (OfficeLayout, FloorColor, Character, etc.) + re-exports constants from constants.ts
@@ -71,13 +82,11 @@ scripts/                      — 7-stage asset extraction pipeline
 
 ## Core Concepts
 
-**Vocabulary**: Terminal = VS Code terminal running Claude. Session = JSONL conversation file. Agent = webview character bound 1:1 to a terminal.
+**Vocabulary**: Session = JSONL conversation file in `~/.claude/projects/<hash>/`. Agent = webview character bound 1:1 to an active session.
 
-**Extension ↔ Webview**: `postMessage` protocol. Key messages: `openClaude`, `agentCreated/Closed`, `focusAgent`, `agentToolStart/Done/Clear`, `agentStatus`, `existingAgents`, `layoutLoaded`, `furnitureAssetsLoaded`, `floorTilesLoaded`, `wallTilesLoaded`, `saveLayout`, `saveAgentSeats`, `exportLayout`, `importLayout`, `settingsLoaded`, `setSoundEnabled`.
+**Backend ↔ Frontend**: Tauri events (backend → frontend) dispatched as synthetic `MessageEvent`s via `tauriAdapter.ts`. Frontend → backend via `invoke()` mapped by `tauriSend()`. Key events: `agentCreated/Closed`, `agentToolStart/Done/Clear`, `agentStatus`, `agentToolPermission`, `layoutLoaded`, `settingsLoaded`. Key commands: `webview_ready`, `save_layout`, `save_agent_seats`, `set_sound_enabled`, `export_layout`, `import_layout`, `close_agent`.
 
-**One-agent-per-terminal**: Each "+ Agent" click → new terminal (`claude --session-id <uuid>`) → immediate agent creation → 1s poll for `<uuid>.jsonl` → file watching starts.
-
-**Terminal adoption**: Project-level 1s scan detects unknown JSONL files. If active terminal has no agent → adopt. If focused agent exists → reassign (`/clear` handling).
+**Passive discovery**: Every 5s, `discovery.rs` scans `~/.claude/projects/*/` for JSONL files with `mtime < 30s`. New active sessions → `agent-created` event. Sessions going inactive → `agent-closed` event. No terminals are created or managed.
 
 ## Agent Status Tracking
 
@@ -173,9 +182,13 @@ Toggle via "Layout" button. Tools: SELECT (default), Floor paint, Wall paint, Er
 ## Build & Dev
 
 ```sh
-npm install && cd webview-ui && npm install && cd .. && npm run build
+npm install && cd webview-ui && npm install && cd ..
+npm run dev          # Starts Vite dev server + compiles Rust + opens Tauri window
+npm run build        # Production build (generates native binary)
 ```
-Build: type-check → lint → esbuild (extension) → vite (webview). F5 for Extension Dev Host.
+Build: Tauri runs `beforeBuildCommand` (Vite build) then compiles Rust → native binary at `src-tauri/target/release/pixel-agents`.
+
+**Passive monitoring**: The app does NOT launch terminals. It scans `~/.claude/projects/` every 5s for active JSONL sessions (mtime < 30s). Each active session = one animated character. Project name extracted from directory hash via greedy path reconstruction.
 
 ## TypeScript Constraints
 

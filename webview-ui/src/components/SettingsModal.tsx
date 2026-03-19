@@ -1,6 +1,7 @@
 import { useState } from 'react';
 
 import { isSoundEnabled, setSoundEnabled } from '../notificationSound.js';
+import { isTauriRuntime } from '../runtime.js';
 import { vscode } from '../vscodeApi.js';
 
 interface SettingsModalProps {
@@ -118,7 +119,20 @@ export function SettingsModal({
         </button>
         <button
           onClick={() => {
-            vscode.postMessage({ type: 'exportLayout' });
+            if (isTauriRuntime) {
+              // Use Tauri dialog to get save path, then invoke export
+              void import('@tauri-apps/plugin-dialog').then(async ({ save }) => {
+                const path = await save({
+                  defaultPath: 'pixel-agents-layout.json',
+                  filters: [{ name: 'JSON', extensions: ['json'] }],
+                });
+                if (path) {
+                  vscode.postMessage({ type: 'exportLayout', path });
+                }
+              });
+            } else {
+              vscode.postMessage({ type: 'exportLayout' });
+            }
             onClose();
           }}
           onMouseEnter={() => setHovered('export')}
@@ -132,7 +146,20 @@ export function SettingsModal({
         </button>
         <button
           onClick={() => {
-            vscode.postMessage({ type: 'importLayout' });
+            if (isTauriRuntime) {
+              // Use Tauri dialog to get file path, then invoke import
+              void import('@tauri-apps/plugin-dialog').then(async ({ open }) => {
+                const path = await open({
+                  multiple: false,
+                  filters: [{ name: 'JSON', extensions: ['json'] }],
+                });
+                if (path) {
+                  vscode.postMessage({ type: 'importLayout', path });
+                }
+              });
+            } else {
+              vscode.postMessage({ type: 'importLayout' });
+            }
             onClose();
           }}
           onMouseEnter={() => setHovered('import')}

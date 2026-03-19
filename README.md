@@ -1,47 +1,51 @@
 <h1 align="center">
-    <a href="https://github.com/pablodelucca/pixel-agents/discussions">
-        <img src="webview-ui/public/banner.png" alt="Pixel Agents">
-    </a>
+    <img src="webview-ui/public/banner.png" alt="Pixel Agents">
 </h1>
 
 <h2 align="center" style="padding-bottom: 20px;">
   The game interface where AI agents build real things
 </h2>
 
-<div align="center" style="margin-top: 25px;">
+<br/>
 
-[![version](https://img.shields.io/endpoint?url=https%3A%2F%2Fgist.githubusercontent.com%2Fpablodelucca%2F3cd28398fa4a2c0a636e1d51d41aee39%2Fraw%2Fversion.json)](https://github.com/pablodelucca/pixel-agents/releases)
-[![marketplaces](https://img.shields.io/endpoint?url=https%3A%2F%2Fgist.githubusercontent.com%2Fpablodelucca%2F3cd28398fa4a2c0a636e1d51d41aee39%2Fraw%2Finstalls.json)](https://marketplace.visualstudio.com/items?itemName=pablodelucca.pixel-agents)
-[![stars](https://img.shields.io/github/stars/pablodelucca/pixel-agents?logo=github&color=0183ff&style=flat)](https://github.com/pablodelucca/pixel-agents/stargazers)
-[![license](https://img.shields.io/github/license/pablodelucca/pixel-agents?color=0183ff&style=flat)](https://github.com/pablodelucca/pixel-agents/blob/main/LICENSE)
-[![good first issues](https://img.shields.io/github/issues/pablodelucca/pixel-agents/good%20first%20issue?color=7057ff&label=good%20first%20issues)](https://github.com/pablodelucca/pixel-agents/issues?q=is%3Aopen+is%3Aissue+label%3A%22good+first+issue%22)
-
-</div>
-
-<div align="center">
-<a href="https://marketplace.visualstudio.com/items?itemName=pablodelucca.pixel-agents">🛒 VS Code Marketplace</a> • <a href="https://github.com/pablodelucca/pixel-agents/discussions">💬 Discussions</a> • <a href="https://github.com/pablodelucca/pixel-agents/issues">🐛 Issues</a> • <a href="CONTRIBUTING.md">🤝 Contributing</a> • <a href="CHANGELOG.md">📋 Changelog</a>
-</div>
+> **This is a fork.** The [original Pixel Agents](https://github.com/pablodelucca/pixel-agents) is a VS Code extension — it only works inside VS Code and requires you to launch Claude Code terminals from within the editor.
+>
+> **This fork is a standalone desktop app** built with [Tauri](https://tauri.app/). It runs independently of any editor, passively monitors **all** your Claude Code sessions across your entire machine, and shows each one as an animated character in real time. You don't need VS Code open. You don't need to click "+ Agent". Just run Claude Code anywhere — in any terminal, in any project — and the characters appear automatically.
 
 <br/>
 
-Pixel Agents turns multi-agent AI systems into something you can actually see and manage. Each agent becomes a character in a pixel art office. They walk around, sit at their desk, and visually reflect what they are doing — typing when writing code, reading when searching files, waiting when it needs your attention.
+## Why this fork exists
 
-Right now it works as a VS Code extension with Claude Code. The vision though, is a fully agent-agnostic, platform-agnostic interface for orchestrating any AI agents, deployable anywhere.
+The original extension is great, but it's tied to VS Code. If you use Claude Code from a standalone terminal, from Cursor, from Warp, or from multiple VS Code windows at once, the extension can't see all of them.
 
-This is the source code for the free Pixel Agents extension for VS Code — install from the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=pablodelucca.pixel-agents) or [Open VSX](https://open-vsx.org/extension/pablodelucca/pixel-agents) with the full furniture catalog included.
+This fork solves that by watching `~/.claude/projects/` directly. Every active Claude Code session on your machine shows up as a character, regardless of where it's running. The app sits in its own window and gives you a birds-eye view of everything your agents are doing.
+
+**Key differences from the original:**
+
+| | Original (VS Code extension) | This fork (Tauri standalone) |
+|---|---|---|
+| **Runtime** | VS Code webview panel | Native desktop app (Tauri + Rust) |
+| **Detection** | Only terminals opened inside VS Code | All Claude Code sessions on the machine |
+| **Agent creation** | Manual (click "+ Agent") | Automatic (monitors `~/.claude/projects/`) |
+| **Editor dependency** | Requires VS Code | None — works with any terminal |
+| **Backend** | Node.js + VS Code API | Rust (async, low resource usage) |
 
 ![Pixel Agents screenshot](webview-ui/public/Screenshot.jpg)
 
 ## Features
 
-- **One agent, one character** — every Claude Code terminal gets its own animated character
+Everything from the original, plus standalone operation:
+
+- **Automatic agent discovery** — every active Claude Code session becomes a character, no manual setup
+- **Editor-independent** — works with any terminal: iTerm, Warp, Alacritty, VS Code, Cursor, etc.
+- **Project name detection** — each character is labeled with its project name, extracted from the session path
 - **Live activity tracking** — characters animate based on what the agent is actually doing (writing, reading, running commands)
 - **Office layout editor** — design your office with floors, walls, and furniture using a built-in editor
 - **Speech bubbles** — visual indicators when an agent is waiting for input or needs permission
 - **Sound notifications** — optional chime when an agent finishes its turn
 - **Sub-agent visualization** — Task tool sub-agents spawn as separate characters linked to their parent
-- **Persistent layouts** — your office design is saved and shared across VS Code windows
-- **Diverse characters** — 6 diverse characters. These are based on the amazing work of [JIK-A-4, Metro City](https://jik-a-4.itch.io/metrocity-free-topdown-character-pack).
+- **Persistent layouts** — your office design is saved across sessions
+- **Diverse characters** — 6 diverse characters based on the work of [JIK-A-4, Metro City](https://jik-a-4.itch.io/metrocity-free-topdown-character-pack)
 
 <p align="center">
   <img src="webview-ui/public/characters.png" alt="Pixel Agents characters" width="320" height="72" style="image-rendering: pixelated;">
@@ -49,30 +53,37 @@ This is the source code for the free Pixel Agents extension for VS Code — inst
 
 ## Requirements
 
-- VS Code 1.105.0 or later
+- macOS, Linux, or Windows
 - [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code) installed and configured
+- [Rust toolchain](https://rustup.rs/) (for building from source)
 
 ## Getting Started
-
-If you just want to use Pixel Agents, the easiest way is to download the [VS Code extension](https://marketplace.visualstudio.com/items?itemName=pablodelucca.pixel-agents). If you want to play with the code, develop, or contribute, then:
 
 ### Install from source
 
 ```bash
-git clone https://github.com/pablodelucca/pixel-agents.git
+git clone https://github.com/YOUR_USERNAME/pixel-agents.git
 cd pixel-agents
 npm install
 cd webview-ui && npm install && cd ..
 npm run build
 ```
 
-Then press **F5** in VS Code to launch the Extension Development Host.
+The compiled binary will be at `src-tauri/target/release/pixel-agents`.
+
+### Development
+
+```bash
+npm run dev
+```
+
+This starts the Vite dev server and the Tauri app with hot-reload.
 
 ### Usage
 
-1. Open the **Pixel Agents** panel (it appears in the bottom panel area alongside your terminal)
-2. Click **+ Agent** to spawn a new Claude Code terminal and its character
-3. Start coding with Claude — watch the character react in real time
+1. Launch the app — it opens a standalone window with the pixel art office
+2. Open Claude Code in **any terminal** on your machine
+3. Watch the character appear automatically and animate in real time
 4. Click a character to select it, then click a seat to reassign it
 5. Click **Layout** to open the office editor and customize your space
 
@@ -102,20 +113,20 @@ Characters are based on the amazing work of [JIK-A-4, Metro City](https://jik-a-
 
 ## How It Works
 
-Pixel Agents watches Claude Code's JSONL transcript files to track what each agent is doing. When an agent uses a tool (like writing a file or running a command), the extension detects it and updates the character's animation accordingly. No modifications to Claude Code are needed — it's purely observational.
+Every 5 seconds, the Rust backend scans `~/.claude/projects/` for JSONL transcript files that were recently modified. Each active file becomes an agent. The backend reads new lines incrementally, parses tool_use/tool_result/turn_duration records, and emits events to the frontend via Tauri IPC.
 
-The webview runs a lightweight game loop with canvas rendering, BFS pathfinding, and a character state machine (idle → walk → type/read). Everything is pixel-perfect at integer zoom levels.
+The frontend is a React app running inside a native Tauri window. It renders a pixel art office with a canvas-based game loop, BFS pathfinding, and a character state machine (idle, walk, type, read). Characters animate based on what the agent is actually doing. No modifications to Claude Code are needed — it's purely observational.
 
 ## Tech Stack
 
-- **Extension**: TypeScript, VS Code Webview API, esbuild
-- **Webview**: React 19, TypeScript, Vite, Canvas 2D
+- **Backend**: Rust, Tauri v2, Tokio (async runtime), notify (file watching)
+- **Frontend**: React 19, TypeScript, Vite, Canvas 2D
+- **IPC**: Tauri events (backend to frontend) + Tauri commands (frontend to backend)
 
 ## Known Limitations
 
-- **Agent-terminal sync** — the way agents are connected to Claude Code terminal instances is not super robust and sometimes desyncs, especially when terminals are rapidly opened/closed or restored across sessions.
-- **Heuristic-based status detection** — Claude Code's JSONL transcript format does not provide clear signals for when an agent is waiting for user input or when it has finished its turn. The current detection is based on heuristics (idle timers, turn-duration events) and often misfires — agents may briefly show the wrong status or miss transitions.
-- **Windows-only testing** — the extension has only been tested on Windows 11. It may work on macOS or Linux, but there could be unexpected issues with file watching, paths, or terminal behavior on those platforms.
+- **Heuristic-based status detection** — Claude Code's JSONL transcript format does not provide clear signals for when an agent is waiting for user input or when it has finished its turn. The current detection is based on heuristics (idle timers, turn-duration events) and may occasionally misfire.
+- **Session detection delay** — new sessions are detected within 5 seconds. Sessions are considered inactive after 5 minutes without JSONL writes.
 
 ## Where This Is Going
 

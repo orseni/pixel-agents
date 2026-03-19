@@ -135,7 +135,9 @@ export function useExtensionMessages(
         }
       } else if (msg.type === 'agentCreated') {
         const id = msg.id as number;
-        const folderName = msg.folderName as string | undefined;
+        // Support both folderName (VS Code) and projectName (Tauri)
+        const folderName =
+          (msg.projectName as string | undefined) ?? (msg.folderName as string | undefined);
         setAgents((prev) => (prev.includes(id) ? prev : [...prev, id]));
         setSelectedAgent(id);
         os.addAgent(id, undefined, undefined, undefined, undefined, folderName);

@@ -23,9 +23,15 @@ interface DecodedCache {
 
 // ── Vite plugin ───────────────────────────────────────────────────────────────
 
+// Detect if building for Tauri (TAURI_ENV_PLATFORM is set during `tauri build/dev`)
+const isTauriBuild = !!process.env.TAURI_ENV_PLATFORM;
+
 function browserMockAssetsPlugin(): Plugin {
   const assetsDir = path.resolve(__dirname, 'public/assets');
-  const distAssetsDir = path.resolve(__dirname, '../dist/webview/assets');
+  // In Tauri build: output to local dist/assets; in VS Code: output to ../dist/webview/assets
+  const distAssetsDir = isTauriBuild
+    ? path.resolve(__dirname, 'dist/assets')
+    : path.resolve(__dirname, '../dist/webview/assets');
 
   const cache: DecodedCache = { characters: null, floors: null, walls: null, furniture: null };
 
@@ -101,8 +107,15 @@ function browserMockAssetsPlugin(): Plugin {
 export default defineConfig({
   plugins: [react(), browserMockAssetsPlugin()],
   build: {
-    outDir: '../dist/webview',
+    // In Tauri: output to local dist/; in VS Code: output to ../dist/webview
+    outDir: isTauriBuild ? 'dist' : '../dist/webview',
     emptyOutDir: true,
   },
   base: './',
+  // Vite dev server config for Tauri
+  server: {
+    // Tauri expects a fixed port
+    port: 5173,
+    strictPort: true,
+  },
 });
