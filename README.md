@@ -87,6 +87,7 @@ This starts the Vite dev server and the Tauri app with hot-reload.
 3. Watch the character appear automatically and animate in real time
 4. Click a character to select it, then click a seat to reassign it
 5. Click **Layout** to open the office editor and customize your space
+6. Hold **Tab** to temporarily show all agent labels — release to hide them
 
 ## Office Themes
 

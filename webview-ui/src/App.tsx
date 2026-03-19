@@ -157,12 +157,31 @@ function App() {
 
   const [isDebugMode, setIsDebugMode] = useState(false);
   const [alwaysShowOverlay, setAlwaysShowOverlay] = useState(false);
+  const [tabHeld, setTabHeld] = useState(false);
 
   const handleToggleDebugMode = useCallback(() => setIsDebugMode((prev) => !prev), []);
   const handleToggleAlwaysShowOverlay = useCallback(
     () => setAlwaysShowOverlay((prev) => !prev),
     [],
   );
+
+  useEffect(() => {
+    const down = (e: KeyboardEvent) => {
+      if (e.key === 'Tab') {
+        e.preventDefault();
+        setTabHeld(true);
+      }
+    };
+    const up = (e: KeyboardEvent) => {
+      if (e.key === 'Tab') setTabHeld(false);
+    };
+    window.addEventListener('keydown', down);
+    window.addEventListener('keyup', up);
+    return () => {
+      window.removeEventListener('keydown', down);
+      window.removeEventListener('keyup', up);
+    };
+  }, []);
 
   const handleSelectAgent = useCallback((id: number) => {
     vscode.postMessage({ type: 'focusAgent', id });
@@ -357,7 +376,7 @@ function App() {
           zoom={editor.zoom}
           panRef={editor.panRef}
           onCloseAgent={handleCloseAgent}
-          alwaysShowOverlay={alwaysShowOverlay}
+          alwaysShowOverlay={alwaysShowOverlay || tabHeld}
         />
       )}
 
