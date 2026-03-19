@@ -8,6 +8,13 @@
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      document.body.style.background='#1e1e2e';
+      document.body.style.color='#ccc';
+      document.getElementById('root').innerText='Loading JS...';
+      window.onerror=function(m,s,l,c,e){document.getElementById('root').innerHTML='<pre style="color:red;padding:20px">ONERROR: '+m+'\n'+s+':'+l+'\n'+(e&&e.stack||'')+'</pre>';};
+      window.onunhandledrejection=function(e){document.getElementById('root').innerHTML='<pre style="color:red;padding:20px">PROMISE ERROR: '+(e.reason&&e.reason.stack||e.reason||e)+'</pre>';};
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

@@ -11,6 +11,8 @@ pub mod state;
 pub mod timer_manager;
 pub mod transcript_parser;
 
+use tauri::Manager;
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tracing_subscriber::fmt::init();
@@ -41,6 +43,12 @@ pub fn run() {
             commands::close_agent,
         ])
         .setup(|app| {
+            // Open devtools in debug builds
+            #[cfg(debug_assertions)]
+            if let Some(window) = app.get_webview_window("main") {
+                window.open_devtools();
+            }
+
             let app_handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
                 discovery::start_discovery_loop(app_handle).await;

@@ -72,7 +72,10 @@ export function useEditorActions(
   const [isDirty, setIsDirty] = useState(false);
   const [zoom, setZoom] = useState(defaultZoom);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const panRef = useRef({ x: 0, y: 0 });
+  // Start with upward offset so the map appears visually centered
+  // (the toolbar at the bottom shifts the perceived center down)
+  const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
+  const panRef = useRef({ x: 0, y: -Math.round(80 * dpr) });
   const lastSavedLayoutRef = useRef<OfficeLayout | null>(null);
 
   // Called by useExtensionMessages on layoutLoaded to set the initial checkpoint
