@@ -1,8 +1,15 @@
-import { useState } from 'react';
+import { useCallback,useState } from 'react';
 
 import { isSoundEnabled, setSoundEnabled } from '../notificationSound.js';
 import { isTauriRuntime } from '../runtime.js';
 import { vscode } from '../vscodeApi.js';
+
+const PRESETS = [
+  { id: 'corporate', name: 'Corporate', desc: 'Formal office with rows of desks' },
+  { id: 'startup', name: 'Startup', desc: 'Open plan with lounge & brainstorm' },
+  { id: 'cozy-library', name: 'Library', desc: 'Bookshelves, reading nooks, warm' },
+  { id: 'garden-office', name: 'Garden', desc: 'Plants everywhere, earthy tones' },
+] as const;
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -38,6 +45,16 @@ export function SettingsModal({
 }: SettingsModalProps) {
   const [hovered, setHovered] = useState<string | null>(null);
   const [soundLocal, setSoundLocal] = useState(isSoundEnabled);
+  const [showPresets, setShowPresets] = useState(false);
+
+  const applyPreset = useCallback(
+    (presetId: string) => {
+      vscode.postMessage({ type: 'applyPresetLayout', name: presetId });
+      setShowPresets(false);
+      onClose();
+    },
+    [onClose],
+  );
 
   if (!isOpen) return null;
 
@@ -102,6 +119,58 @@ export function SettingsModal({
             X
           </button>
         </div>
+        {/* Office Theme */}
+        <button
+          onClick={() => setShowPresets(!showPresets)}
+          onMouseEnter={() => setHovered('theme')}
+          onMouseLeave={() => setHovered(null)}
+          style={{
+            ...menuItemBase,
+            background: hovered === 'theme' ? 'rgba(255, 255, 255, 0.08)' : 'transparent',
+          }}
+        >
+          <span>Office Theme</span>
+          <span style={{ fontSize: '16px', color: 'rgba(255,255,255,0.4)' }}>
+            {showPresets ? '\u25B2' : '\u25BC'}
+          </span>
+        </button>
+        {showPresets && (
+          <div
+            style={{
+              padding: '2px 6px 6px',
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr',
+              gap: 4,
+            }}
+          >
+            {PRESETS.map((p) => (
+              <button
+                key={p.id}
+                onClick={() => applyPreset(p.id)}
+                onMouseEnter={() => setHovered(`preset-${p.id}`)}
+                onMouseLeave={() => setHovered(null)}
+                style={{
+                  background:
+                    hovered === `preset-${p.id}`
+                      ? 'rgba(90, 140, 255, 0.15)'
+                      : 'rgba(255,255,255,0.04)',
+                  border: '2px solid var(--pixel-border)',
+                  borderRadius: 0,
+                  padding: '6px 8px',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                }}
+              >
+                <div style={{ fontSize: '20px', color: 'rgba(255,255,255,0.9)', marginBottom: 2 }}>
+                  {p.name}
+                </div>
+                <div style={{ fontSize: '14px', color: 'rgba(255,255,255,0.45)', lineHeight: 1.2 }}>
+                  {p.desc}
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
         {/* Menu items */}
         <button
           onClick={() => {

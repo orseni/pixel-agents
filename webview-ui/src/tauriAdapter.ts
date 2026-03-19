@@ -107,6 +107,9 @@ export function tauriSend(msg: Record<string, unknown>): void {
     case 'openSessionsFolder':
       invoke('open_sessions_folder').catch(console.error);
       break;
+    case 'applyPresetLayout':
+      invoke('apply_preset_layout', { name: msg.name }).catch(console.error);
+      break;
     case 'closeAgent':
       invoke('close_agent', { id: msg.id }).catch(console.error);
       break;

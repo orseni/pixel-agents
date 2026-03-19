@@ -40,6 +40,7 @@ pub fn run() {
             commands::set_sound_enabled,
             commands::export_layout,
             commands::import_layout,
+            commands::apply_preset_layout,
             commands::open_sessions_folder,
             commands::close_agent,
         ])

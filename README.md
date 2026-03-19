@@ -44,6 +44,7 @@ Everything from the original, plus standalone operation:
 - **Speech bubbles** — visual indicators when an agent is waiting for input or needs permission
 - **Sound notifications** — optional chime when an agent finishes its turn
 - **Sub-agent visualization** — Task tool sub-agents spawn as separate characters linked to their parent
+- **Office theme presets** — 4 built-in office themes to choose from via Settings (Corporate, Startup, Library, Garden)
 - **Persistent layouts** — your office design is saved across sessions
 - **Diverse characters** — 6 diverse characters based on the work of [JIK-A-4, Metro City](https://jik-a-4.itch.io/metrocity-free-topdown-character-pack)
 
@@ -86,6 +87,19 @@ This starts the Vite dev server and the Tauri app with hot-reload.
 3. Watch the character appear automatically and animate in real time
 4. Click a character to select it, then click a seat to reassign it
 5. Click **Layout** to open the office editor and customize your space
+
+## Office Themes
+
+Choose from 4 built-in office presets via **Settings > Office Theme**, or create your own with the layout editor:
+
+| Theme | Description |
+|-------|-------------|
+| **Corporate** | Formal office with rows of desks and PCs, conference room with meeting table, and a small break room. Professional brown and gray tones. |
+| **Startup** | Open-plan workspace with a brainstorm zone (whiteboards), a coffee corner with tables, and a lounge with sofas. Warm, colorful tones with teal accents. |
+| **Library** | Main hall lined with bookshelves, a study room with desks and PCs, and a cozy reading nook with sofas and paintings. Rich warm brown tones. |
+| **Garden** | Plant-filled workspace with hanging plants on every wall, an earthy plant corner, and a relaxation area with sofas. Green and earthy tones throughout. |
+
+The **Startup** theme is the default for new installations. Selecting a theme replaces the current layout — you can always switch back or customize further with the editor.
 
 ## Layout Editor
 

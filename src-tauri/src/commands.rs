@@ -5,6 +5,29 @@ use crate::events::{self, LayoutLoadedPayload, SettingsLoadedPayload};
 use crate::persistence;
 use crate::state::AppState;
 
+// Preset layouts embedded at compile time
+const PRESET_CORPORATE: &str =
+    include_str!("../../webview-ui/public/assets/layout-corporate.json");
+const PRESET_STARTUP: &str =
+    include_str!("../../webview-ui/public/assets/layout-startup.json");
+const PRESET_LIBRARY: &str =
+    include_str!("../../webview-ui/public/assets/layout-cozy-library.json");
+const PRESET_GARDEN: &str =
+    include_str!("../../webview-ui/public/assets/layout-garden-office.json");
+
+// Default layout for new users
+const DEFAULT_LAYOUT_JSON: &str = PRESET_STARTUP;
+
+fn get_preset(name: &str) -> Option<&'static str> {
+    match name {
+        "corporate" => Some(PRESET_CORPORATE),
+        "startup" => Some(PRESET_STARTUP),
+        "cozy-library" => Some(PRESET_LIBRARY),
+        "garden-office" => Some(PRESET_GARDEN),
+        _ => None,
+    }
+}
+
 #[tauri::command]
 pub async fn webview_ready(app: AppHandle, state: tauri::State<'_, AppState>) -> Result<(), String> {
     tracing::info!("Webview ready signal received");
@@ -26,8 +49,9 @@ pub async fn webview_ready(app: AppHandle, state: tauri::State<'_, AppState>) ->
         },
     );
 
-    // Load and emit layout
-    let layout_result = persistence::load_layout(None);
+    // Load and emit layout (with bundled default as fallback)
+    let default_layout: Option<Value> = serde_json::from_str(DEFAULT_LAYOUT_JSON).ok();
+    let layout_result = persistence::load_layout(default_layout.as_ref());
     if let Some((layout, was_reset)) = layout_result {
         events::emit_to_webview(
             &app,
@@ -107,6 +131,27 @@ pub async fn import_layout(path: String, app: AppHandle) -> Result<(), String> {
     }
 
     // Write and emit
+    persistence::write_layout_to_file(&layout)?;
+
+    events::emit_to_webview(
+        &app,
+        "layout-loaded",
+        LayoutLoadedPayload {
+            r#type: "layoutLoaded".to_string(),
+            layout,
+            was_reset: None,
+        },
+    );
+
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn apply_preset_layout(name: String, app: AppHandle) -> Result<(), String> {
+    let json_str = get_preset(&name).ok_or_else(|| format!("Unknown preset: {}", name))?;
+    let layout: Value =
+        serde_json::from_str(json_str).map_err(|e| format!("Parse error: {}", e))?;
+
     persistence::write_layout_to_file(&layout)?;
 
     events::emit_to_webview(
