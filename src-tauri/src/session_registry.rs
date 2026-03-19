@@ -79,17 +79,36 @@ pub fn cwd_to_project_hash(cwd: &str) -> String {
 }
 
 /// Get the JSONL file path for a session, if it exists on disk.
+/// Falls back to the most recently modified JSONL in the project directory
+/// when the registry sessionId doesn't match (e.g. after /clear).
 pub fn session_jsonl_path(session: &SessionInfo) -> Option<PathBuf> {
     let projects_dir = dirs::home_dir()?.join(".claude").join("projects");
     let hash = cwd_to_project_hash(&session.cwd);
-    let jsonl = projects_dir
-        .join(&hash)
-        .join(format!("{}.jsonl", session.session_id));
-    if jsonl.exists() {
-        Some(jsonl)
-    } else {
-        None
+    let project_dir = projects_dir.join(&hash);
+
+    // Try exact sessionId match first
+    let exact = project_dir.join(format!("{}.jsonl", session.session_id));
+    if exact.exists() {
+        return Some(exact);
     }
+
+    // Fallback: find the most recently modified JSONL in the project dir
+    let entries = std::fs::read_dir(&project_dir).ok()?;
+    let mut best: Option<(PathBuf, std::time::SystemTime)> = None;
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.extension().and_then(|e| e.to_str()) != Some("jsonl") {
+            continue;
+        }
+        if let Ok(meta) = path.metadata() {
+            if let Ok(mtime) = meta.modified() {
+                if best.as_ref().map_or(true, |(_, t)| mtime > *t) {
+                    best = Some((path, mtime));
+                }
+            }
+        }
+    }
+    best.map(|(p, _)| p)
 }
 
 #[cfg(test)]
