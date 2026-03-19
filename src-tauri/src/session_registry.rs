@@ -73,9 +73,9 @@ pub fn is_pid_alive(_pid: u32) -> bool {
 }
 
 /// Convert a working directory path to the Claude project hash.
-/// Claude hashes project paths by replacing `:`, `\`, and `/` with `-`.
+/// Claude hashes project paths by replacing `/`, `\`, `:`, `.`, and `_` with `-`.
 pub fn cwd_to_project_hash(cwd: &str) -> String {
-    cwd.replace(['/', '\\', ':'], "-")
+    cwd.replace(['/', '\\', ':', '.', '_'], "-")
 }
 
 /// Get the JSONL file path for a session, if it exists on disk.
@@ -128,6 +128,14 @@ mod tests {
         assert_eq!(
             cwd_to_project_hash("C:\\Users\\user\\project"),
             "C--Users-user-project"
+        );
+    }
+
+    #[test]
+    fn test_cwd_to_project_hash_dots_and_underscores() {
+        assert_eq!(
+            cwd_to_project_hash("/Users/orseni/Desenvolvimento/recria.ai/agentic_db_colector"),
+            "-Users-orseni-Desenvolvimento-recria-ai-agentic-db-colector"
         );
     }
 }
