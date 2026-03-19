@@ -2490,6 +2490,7 @@ name = "pixel-agents"
 version = "0.1.0"
 dependencies = [
  "dirs",
+ "libc",
  "notify",
  "open",
  "serde",

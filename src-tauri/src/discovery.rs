@@ -1,53 +1,25 @@
-use std::collections::HashMap;
-use std::path::PathBuf;
-use std::time::SystemTime;
+use std::collections::{HashMap, HashSet};
 use tauri::{AppHandle, Manager};
 use tokio::time::{interval, Duration};
 
-use crate::constants::{DISCOVERY_SCAN_INTERVAL_MS, SESSION_INACTIVE_THRESHOLD_SECS};
+use crate::constants::DISCOVERY_SCAN_INTERVAL_MS;
 use crate::events::{self, AgentClosedPayload, AgentCreatedPayload};
 use crate::file_watcher;
 use crate::project_name::extract_project_name;
+use crate::session_registry;
 use crate::state::AppState;
 
-/// Get the Claude projects directory: ~/.claude/projects/
-fn get_claude_projects_dir() -> Option<PathBuf> {
-    dirs::home_dir().map(|h| h.join(".claude").join("projects"))
-}
-
-/// Check if a JSONL file was recently modified (candidate for new agent).
-fn is_recently_active(path: &PathBuf) -> bool {
-    let Ok(metadata) = std::fs::metadata(path) else {
-        return false;
-    };
-    let Ok(modified) = metadata.modified() else {
-        return false;
-    };
-    let Ok(elapsed) = SystemTime::now().duration_since(modified) else {
-        return false;
-    };
-    elapsed.as_secs() < SESSION_INACTIVE_THRESHOLD_SECS
-}
-
-/// Check if a session is still alive: file exists and was modified within
-/// a generous window (5 minutes). Agents waiting for user input can be
-/// idle for a while but the session is still valid.
-fn is_session_alive(path: &PathBuf) -> bool {
-    let Ok(metadata) = std::fs::metadata(path) else {
-        return false; // file deleted
-    };
-    let Ok(modified) = metadata.modified() else {
-        return false;
-    };
-    let Ok(elapsed) = SystemTime::now().duration_since(modified) else {
-        return false;
-    };
-    // 5 minutes — generous window for idle sessions
-    elapsed.as_secs() < 300
+/// Info about a tracked session
+struct TrackedSession {
+    agent_id: i64,
+    pid: u32,
+    file_key: String,
 }
 
 /// Main discovery loop — runs on a background tokio task.
-/// Scans ~/.claude/projects/*/*.jsonl for active sessions.
+/// Uses ~/.claude/sessions/ PID registry for reliable session detection.
+/// Sessions stay alive as long as the Claude Code process is running,
+/// regardless of JSONL file activity.
 pub async fn start_discovery_loop(app: AppHandle) {
     let state = app.state::<AppState>();
 
@@ -62,155 +34,144 @@ pub async fn start_discovery_loop(app: AppHandle) {
         tokio::time::sleep(Duration::from_millis(500)).await;
     }
 
-    tracing::info!("Discovery loop started");
+    tracing::info!("Discovery loop started (PID-based session detection)");
 
     let mut tick = interval(Duration::from_millis(DISCOVERY_SCAN_INTERVAL_MS));
-    // Track JSONL files we've created agents for: file_key → agent_id
-    let mut tracked: HashMap<String, i64> = HashMap::new();
+    // Track sessions: session_id → TrackedSession
+    let mut tracked: HashMap<String, TrackedSession> = HashMap::new();
 
     loop {
         tick.tick().await;
 
-        let projects_dir = match get_claude_projects_dir() {
-            Some(d) if d.exists() => d,
-            _ => continue,
-        };
+        // Read active sessions from PID registry (~/.claude/sessions/*.json)
+        let active_sessions = session_registry::read_active_sessions();
 
-        // Scan all project directories
-        let Ok(entries) = std::fs::read_dir(&projects_dir) else {
-            continue;
-        };
+        // Collect active session IDs for dead-check later
+        let active_session_ids: HashSet<String> = active_sessions
+            .iter()
+            .map(|s| s.session_id.clone())
+            .collect();
 
-        for entry in entries.flatten() {
-            let project_path = entry.path();
-            if !project_path.is_dir() {
+        // Check for new sessions
+        for session in &active_sessions {
+            if tracked.contains_key(&session.session_id) {
                 continue;
             }
 
-            let project_hash = entry
-                .file_name()
-                .to_string_lossy()
-                .to_string();
-
-            let Ok(jsonl_entries) = std::fs::read_dir(&project_path) else {
-                continue;
+            // Find the JSONL file for this session
+            let Some(jsonl_path) = session_registry::session_jsonl_path(session) else {
+                continue; // JSONL not created yet, retry next scan
             };
 
-            for jsonl_entry in jsonl_entries.flatten() {
-                let jsonl_path = jsonl_entry.path();
-                let Some(ext) = jsonl_path.extension() else {
-                    continue;
-                };
-                if ext != "jsonl" {
-                    continue;
-                }
+            let file_key = jsonl_path.to_string_lossy().to_string();
 
-                let file_key = jsonl_path.to_string_lossy().to_string();
-
-                // Skip if already tracked
-                if tracked.contains_key(&file_key) {
+            // Check if already watched by another tracking entry
+            {
+                let watched = state.watched_files.read().await;
+                if watched.contains_key(&file_key) {
                     continue;
                 }
-
-                // Only create agents for recently active sessions
-                if !is_recently_active(&jsonl_path) {
-                    continue;
-                }
-
-                // Check if already watched by another path
-                {
-                    let watched = state.watched_files.read().await;
-                    if watched.contains_key(&file_key) {
-                        continue;
-                    }
-                }
-
-                // New active session — create agent
-                let project_name = extract_project_name(&project_hash);
-                let agent_id = state.allocate_agent_id().await;
-
-                tracing::info!(
-                    "Discovered active session: {} (project: {})",
-                    jsonl_path.display(),
-                    project_name
-                );
-
-                // Create agent state
-                {
-                    let mut agents = state.agents.write().await;
-                    let agent = crate::models::AgentState::new(
-                        agent_id,
-                        project_path.clone(),
-                        project_name.clone(),
-                        jsonl_path.clone(),
-                    );
-                    agents.insert(agent_id, agent);
-                }
-
-                // Track watched file
-                {
-                    let mut watched = state.watched_files.write().await;
-                    watched.insert(file_key.clone(), agent_id);
-                }
-
-                tracked.insert(file_key, agent_id);
-
-                // Emit agent-created event
-                events::emit_to_webview(
-                    &app,
-                    "agent-created",
-                    AgentCreatedPayload {
-                        r#type: "agentCreated".to_string(),
-                        id: agent_id,
-                        project_name: project_name.clone(),
-                    },
-                );
-
-                // Start file watching for this session
-                let app_clone = app.clone();
-                let jsonl_clone = jsonl_path.clone();
-                tokio::spawn(async move {
-                    file_watcher::start_watching(app_clone, agent_id, jsonl_clone).await;
-                });
             }
+
+            // Extract project name from hash
+            let project_hash = session_registry::cwd_to_project_hash(&session.cwd);
+            let project_name = extract_project_name(&project_hash);
+            let project_path = jsonl_path.parent().unwrap().to_path_buf();
+            let agent_id = state.allocate_agent_id().await;
+
+            tracing::info!(
+                "Discovered active session: {} (project: {}, pid: {})",
+                jsonl_path.display(),
+                project_name,
+                session.pid,
+            );
+
+            // Create agent state
+            {
+                let mut agents = state.agents.write().await;
+                let agent = crate::models::AgentState::new(
+                    agent_id,
+                    project_path,
+                    project_name.clone(),
+                    jsonl_path.clone(),
+                );
+                agents.insert(agent_id, agent);
+            }
+
+            // Track watched file
+            {
+                let mut watched = state.watched_files.write().await;
+                watched.insert(file_key.clone(), agent_id);
+            }
+
+            tracked.insert(
+                session.session_id.clone(),
+                TrackedSession {
+                    agent_id,
+                    pid: session.pid,
+                    file_key,
+                },
+            );
+
+            // Emit agent-created event
+            events::emit_to_webview(
+                &app,
+                "agent-created",
+                AgentCreatedPayload {
+                    r#type: "agentCreated".to_string(),
+                    id: agent_id,
+                    project_name: project_name.clone(),
+                },
+            );
+
+            // Start file watching for this session
+            let app_clone = app.clone();
+            let jsonl_clone = jsonl_path.clone();
+            tokio::spawn(async move {
+                file_watcher::start_watching(app_clone, agent_id, jsonl_clone).await;
+            });
         }
 
-        // Check for sessions that are no longer alive (file deleted or idle > 5min)
+        // Check for dead sessions (PID no longer alive)
         let dead: Vec<String> = tracked
             .keys()
-            .filter(|file_key| !is_session_alive(&PathBuf::from(file_key.as_str())))
+            .filter(|session_id| !active_session_ids.contains(*session_id))
             .cloned()
             .collect();
 
-        for file_key in dead {
-            let Some(agent_id) = tracked.remove(&file_key) else {
+        for session_id in dead {
+            let Some(session) = tracked.remove(&session_id) else {
                 continue;
             };
 
-            tracing::info!("Session no longer alive: {} (agent {})", file_key, agent_id);
+            tracing::info!(
+                "Session closed (pid {} exited): agent {}",
+                session.pid,
+                session.agent_id,
+            );
 
             // Remove agent state
             {
                 let mut agents = state.agents.write().await;
-                agents.remove(&agent_id);
+                agents.remove(&session.agent_id);
             }
 
             // Remove from watched files
             {
                 let mut watched = state.watched_files.write().await;
-                watched.remove(&file_key);
+                watched.remove(&session.file_key);
             }
 
             // Cancel timers
             {
                 let mut wt = state.waiting_timers.write().await;
-                if let Some(handle) = wt.remove(&agent_id) {
+                if let Some(handle) = wt.remove(&session.agent_id) {
                     handle.abort();
                 }
             }
             {
                 let mut pt = state.permission_timers.write().await;
-                if let Some(handle) = pt.remove(&agent_id) {
+                if let Some(handle) = pt.remove(&session.agent_id) {
                     handle.abort();
                 }
             }
@@ -221,7 +182,7 @@ pub async fn start_discovery_loop(app: AppHandle) {
                 "agent-closed",
                 AgentClosedPayload {
                     r#type: "agentClosed".to_string(),
-                    id: agent_id,
+                    id: session.agent_id,
                 },
             );
         }

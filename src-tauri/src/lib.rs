@@ -7,6 +7,7 @@ pub mod line_reader;
 pub mod models;
 pub mod persistence;
 pub mod project_name;
+pub mod session_registry;
 pub mod state;
 pub mod timer_manager;
 pub mod transcript_parser;

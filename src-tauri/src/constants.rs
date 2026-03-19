@@ -5,8 +5,8 @@ pub const DISCOVERY_SCAN_INTERVAL_MS: u64 = 5000;
 pub const TOOL_DONE_DELAY_MS: u64 = 300;
 pub const PERMISSION_TIMER_DELAY_MS: u64 = 7000;
 pub const TEXT_IDLE_DELAY_MS: u64 = 5000;
-/// Sessions with mtime older than this are considered inactive
-pub const SESSION_INACTIVE_THRESHOLD_SECS: u64 = 30;
+// Note: Session liveness is now determined by PID checks in session_registry.rs,
+// not by JSONL file mtime thresholds.
 
 // Display truncation
 pub const BASH_COMMAND_DISPLAY_MAX_LENGTH: usize = 30;
